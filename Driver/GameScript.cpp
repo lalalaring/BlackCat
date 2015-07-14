@@ -2,10 +2,15 @@
 
 #include "../ServerLib/logger.hpp"
 #include "../ServerLib/TcpServer.h"
+#include "../ServerLib/TcpConnection.h"
 
 #include "LuaVM.h"
+#include "LuaBinder.h"
 
-std::shared_ptr<GameScript> game_script;
+#define CHECK_VM_RUNNING() \
+    if (!running_ || vm_ == 0) { \
+        return; \
+    }
 
 GameScript::GameScript() : running_(false), vm_(0)
 {
@@ -13,15 +18,17 @@ GameScript::GameScript() : running_(false), vm_(0)
 
 void GameScript::Init()
 {
-    script_timer_ = server->SetTimer(game_script->GetScriptFrameFunc(), SCRIPT_FRAME_INTERVAL);
-
     vm_ = new LuaVM;
     if (vm_ == 0) {
-        logger_->Log("Script env init fail");
+        LOG("Script env init fail");
         return;
     }
+
+    LuaBinder binder;
+    binder.Bind(vm_);
+
     if (!vm_->Load("./game_main.lua")) {
-        logger_->Log("Load game main script fail");
+        LOG("Load game main script fail");
         return;
     }
 
@@ -30,10 +37,8 @@ void GameScript::Init()
 
 void GameScript::Run()
 {
-    if (!running_) {
-        return;
-    }
-    Lock l(vm_mutex_);
+    CHECK_VM_RUNNING();
+
     vm_->Call("game_main");
 }
 
@@ -45,5 +50,27 @@ TimerFunc GameScript::GetScriptFrameFunc()
 void GameScript::Stop()
 {
     running_ = false;
-    server->KillTimer(script_timer_);
+}
+
+void GameScript::OnUserConnected(uint32 conn_id)
+{
+    CHECK_VM_RUNNING();
+
+    vm_->Call("OnUserConnected", conn_id);
+}
+
+void GameScript::OnUserDisconnected(uint32 conn_id)
+{
+    CHECK_VM_RUNNING();
+
+    vm_->Call("OnUserDisconnected", conn_id);
+}
+
+void GameScript::OnUserData(uint32 conn_id, const uint8 *buf, uint32 len)
+{
+    CHECK_VM_RUNNING();
+
+    std::string pkt;
+    pkt.append((const char *)buf, len);
+    vm_->Call("OnUserData", conn_id, pkt);
 }

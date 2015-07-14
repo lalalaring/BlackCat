@@ -1,0 +1,11 @@
+
+package ClientGate;
+
+message Ping
+{
+    required uint32 tick = 1;
+}
+message Pong
+{
+    required uint32 tick = 1;
+}

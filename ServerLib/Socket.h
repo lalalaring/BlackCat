@@ -3,6 +3,8 @@
 
 #include "ServerCommon.h"
 
+#include <array>
+
 class Socket
 {
 public:
@@ -19,13 +21,13 @@ public:
 
 public:
     void Connect(const std::function<void(const ErrorCode&)>& cb, const std::string& ip, uint16 port);
-    void Send(const std::function<void(const ErrorCode&, uint32)>& cb, const uint8 *data, uint32 size);
-    void Recv(const std::function<void(const ErrorCode&, uint32)>& cb);
+    void Send(const std::function<void(const ErrorCode&, int32)>& cb, const uint8 *data, int32 size);
+    void Recv(const std::function<void(const ErrorCode&, int32)>& cb);
 
 private:
     IoService                           io_service_;
     TcpSocket                           socket_;
-    boost::array<uint8, MAX_RECV_BUF>   buffer_;
+    std::array<uint8, MAX_RECV_BUF>     buffer_;
 };
 
 inline TcpSocket& Socket::socket()
@@ -48,6 +50,7 @@ inline void Socket::Shutdown()
     // NO EXCEPTION
     ErrorCode ec;
     socket_.shutdown(boost::asio::socket_base::shutdown_both, ec);
+    socket_.close(ec);
 }
 
 #endif // _SOCKET_H

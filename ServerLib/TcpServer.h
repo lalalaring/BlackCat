@@ -2,40 +2,32 @@
 #define _SERVER_H
 
 #include <atomic>
-#include <boost/timer/timer.hpp>
+#include <unordered_set>
 
 #include "ServerCommon.h"
 #include "io_service_pool.hpp"
+#include "IndexMgr.h"
 
-#define NEW_LOG_FILE_INTERVAL 2 // hours
-#define LOGIC_TIMER_INTERVAL  1 // ms
-
+struct TcpServerStartupConfig
+{
+    std::string             ip;
+    std::string             port;
+    std::size_t             io_service_pool_size;
+    FuncOnAccept            on_accept;
+    ConnectionCallBacks     cb;
+};
 class TcpServer : private boost::noncopyable
 {
-    struct TimerContext
-    {
-        uint32 interval;
-        TimerFunc func;
-        boost::timer::cpu_timer timer;
-    };
-
 public:
-    explicit TcpServer(const std::string& address, const std::string& port,
-        std::size_t io_service_pool_size, const FuncOnAccept& func);
-
-    void    SetCallBacks(const ConnectionCallBacks& cb);
+    explicit TcpServer(const TcpServerStartupConfig& config);
 
     void    Run();
 
-    // create a timer, interval: ms, return the ID of timer
-    uint32  SetTimer(const TimerFunc& func, uint32 interval);
-    void    KillTimer(uint32 timer_id);
+    boost::asio::io_service& IoService() { return io_service_pool_.get_io_service(); }
 
 private:
     void    StartAccept();
-
-    void    ResetLoggerTimer();
-    void    ResetLogicTimer();
+    void    ConnectionDown(uint32 id);
 
 private:
     io_service_pool                     io_service_pool_;
@@ -44,16 +36,18 @@ private:
     FuncOnAccept                        OnAccept;
     ConnectionCallBacks                 cb_;
 
-    std::atomic<int32>                  conn_id_;
-
-    std::atomic<int32>                  timer_id_;
-    std::mutex                          timer_mutex_;
-    std::map<uint32, TimerContext>      timer_map_;
-
-    // logger timer
-    boost::asio::deadline_timer         new_log_file_timer_;
-    boost::asio::deadline_timer         server_logic_timer_;
+    IndexMgr<uint32>                    conn_id_mgr_;
 };
 extern std::shared_ptr<TcpServer> server;
+
+inline void TcpServer::Run()
+{
+    io_service_pool_.run();
+}
+
+inline void TcpServer::ConnectionDown(uint32 id)
+{
+    conn_id_mgr_.PutId(id);
+}
 
 #endif // _SERVER_H

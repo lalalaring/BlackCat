@@ -1,14 +1,18 @@
 
-package.path = './?.lua;./zscripts/?.lua;./zscripts/libs/?.lua'
+package.path = './?.lua;./scripts/?.lua;./scripts/libs/?.lua'
 
 math.randomseed(os.time())
 
+require('Common')
+require('UserEvent')
 
-
-require('test.test')
+function SendPkt()
+    local pkt = 'test\0test'
+    local driver = GetDriver()
+    driver:Send(1, pkt)
+end
 
 function game_main()
-    print('game_main')
 end
 
 print('load game_main.lua')

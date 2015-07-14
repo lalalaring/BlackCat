@@ -1,0 +1,9 @@
+
+package PB;
+
+message Packet
+{
+    required uint32     version     = 1;
+    required string     command     = 2;
+    optional string     body        = 3;
+};

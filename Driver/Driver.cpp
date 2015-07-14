@@ -1,25 +1,37 @@
-#include "../ServerLib/TcpServer.h"
-#include "../ServerLib/SessionMgr.h"
+#include "Driver.h"
 
 #include "GameScript.h"
-#include "IoDispatcher.h"
+#include "LuaBinder.h"
+#include "LuaVM.h"
 
-int main()
+Driver *driver = 0;
+
+Driver::Driver()
 {
-    try {
-        // Initialise the server.
-        server.reset(new TcpServer("0.0.0.0", "8992", 1,
-            [=](ConnectionPtr conn) { GetSessionMgr().Add(conn); }));
+    script_.reset(new GameScript);
+    script_->Init();
 
-        // Init script env
-        game_script.reset(new GameScript);
-        game_script->Init();
+    timer_mgr_.reset(new TimerMgr(ios_));
+    script_timer_ = timer_mgr_->AddTimer(script_->GetScriptFrameFunc(), SCRIPT_FRAME_INTERVAL);
+}
 
-        IoDispatcher dispatcher;
-        server->SetCallBacks(dispatcher.GetCallBacks());
-        server->Run();
-    } catch (std::exception& e) {
-        std::cerr << "exception: " << e.what() << "\n";
-        logger_->Log("exception: %s", e.what());
-    }
+void Driver::Run(const DriverStartupConfig& config)
+{
+    gateway_name_ = config.gateway_name;
+
+    InitRpcService(config.service_name, config.rpc_server_addr);
+
+    ios_.run();
+}
+
+void Driver::InitRpcService(const std::string& name, const std::string& rpc_server)
+{
+    driver_.reset(new rpclib::RpcServiceProvider(name));
+    driver_->Connect(rpc_server);
+}
+
+void Driver::Stop()
+{
+    timer_mgr_->Cancel(script_timer_);
+    script_->Stop();
 }
